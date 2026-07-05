@@ -46,8 +46,13 @@ def load_library():
     elif 'ANDROID_DATA' in os.environ:
         library_paths = ('libsecp256k1.so',)
     else:  # desktop Linux and similar
-        library_paths = (os.path.join(os.path.dirname(__file__), 'libsecp256k1.so.0'),
-                         'libsecp256k1.so.0')
+        # Try several common sonames: some distros provide .so.1, others .so.0
+        library_paths = (
+            os.path.join(os.path.dirname(__file__), 'libsecp256k1.so.0'),
+            'libsecp256k1.so.0',
+            'libsecp256k1.so.1',
+            'libsecp256k1.so',
+        )
 
     exceptions = []
     secp256k1 = None

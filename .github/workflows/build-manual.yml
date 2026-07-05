@@ -44,7 +44,7 @@ on:
 
 jobs:
   macos-arm64:
-    runs-on: macos-latest
+    runs-on: macos-14-arm64
     env:
       OPENSSL_DIR: "$(brew --prefix openssl@3)"
       LDFLAGS: "-L$(brew --prefix openssl@3)/lib"
@@ -57,16 +57,16 @@ jobs:
         with:
           ref: ${{ github.event.inputs.target_branch }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9.7'
-          architecture: 'arm64'
-
       - name: Install Homebrew dependencies
         run: |
           brew install secp256k1 openssl@3 gettext autoconf automake libtool coreutils pkgconfig
+          brew link --force gettext
           ln -sf /opt/homebrew/lib/libsecp256k1.6.dylib /opt/homebrew/lib/libsecp256k1.0.dylib
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
       - name: Install Xcode command line tools
         run: |
@@ -100,7 +100,7 @@ jobs:
           retention-days: 7
 
   macos-x86_64:
-    runs-on: macos-latest
+    runs-on: macos-14
     env:
       OPENSSL_DIR: "$(brew --prefix openssl@3)"
       LDFLAGS: "-L$(brew --prefix openssl@3)/lib"
@@ -113,19 +113,19 @@ jobs:
         with:
           ref: ${{ github.event.inputs.target_branch }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9.7'
-          architecture: 'x64'
-
       - name: Install Homebrew dependencies
         run: |
           brew install secp256k1 openssl@3 gettext autoconf automake libtool coreutils pkgconfig
+          brew link --force gettext
           # On Intel macOS, libsecp256k1 is installed to /usr/local/lib
           if [ -d "/usr/local/lib" ]; then
             ln -sf /usr/local/lib/libsecp256k1.6.dylib /usr/local/lib/libsecp256k1.0.dylib
           fi
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
       - name: Install Xcode command line tools
         run: |
@@ -180,6 +180,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libsecp256k1-dev
 
+      - name: Ensure libsecp256k1 soname
+        run: |
+          # Make a compatible soname available for loaders that expect .so.0
+          LIB=$(ldconfig -p | awk '/libsecp256k1/ {print $4; exit}')
+          if [ -n "$LIB" ]; then
+            sudo ln -sf "$LIB" /usr/lib/libsecp256k1.so.0 || true
+            sudo ln -sf "$LIB" /usr/lib/libsecp256k1.so || true
+          fi
+
       - name: Run tests
         run: |
           pip install pytest
@@ -193,7 +202,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: garlium-linux-${{ github.sha }}
-          path: dist/*.AppImage | dist/*.deb
+          path: |
+            dist/*.AppImage
+            dist/*.deb
           retention-days: 7
 
   windows:
