@@ -67,20 +67,28 @@ function DoCodeSignMaybe { # ARGS: infoName fileOrDirName
     codesign -f -v $deep -s "$CODESIGN_CERT" $hardened_arg "$file" || fail "Could not code sign ${infoName}"
 }
 
-info "Installing Python $PYTHON_VERSION"
-PKG_FILE="python-${PYTHON_VERSION}-macosx10.9.pkg"
-if [ ! -f "$CACHEDIR/$PKG_FILE" ]; then
-    curl -o "$CACHEDIR/$PKG_FILE" "https://www.python.org/ftp/python/${PYTHON_VERSION}/$PKG_FILE"
-fi
-echo "f40f7407d20f88a6a64678b6586853de16cc5d7d07c82a8a2a7e43bba59dbae5  $CACHEDIR/$PKG_FILE" | shasum -a 256 -c \
-     || fail "python pkg checksum mismatched"
-sudo installer -pkg "$CACHEDIR/$PKG_FILE" -target / \
-    || fail "failed to install python"
-
-# sanity check "python3" has the version we just installed.
-FOUND_PY_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
-if [[ "$FOUND_PY_VERSION" != "$PYTHON_VERSION" ]]; then
-    fail "python version mismatch: $FOUND_PY_VERSION != $PYTHON_VERSION"
+info "Ensuring Python $PYTHON_VERSION is available (prefer pyenv or existing python3)"
+# Prefer to use pyenv if available to avoid installing system Python.
+FOUND_PY_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))' 2>/dev/null || true)
+if [[ "$FOUND_PY_VERSION" == "$PYTHON_VERSION" ]]; then
+    info "Found matching system python3 ($FOUND_PY_VERSION). Using it."
+else
+    if command -v pyenv > /dev/null 2>&1; then
+        info "pyenv detected. Ensuring Python $PYTHON_VERSION is installed via pyenv."
+        # install if missing (-s to skip if already installed)
+        pyenv install -s $PYTHON_VERSION || fail "pyenv install failed"
+        PYENV_ROOT=$(pyenv root)
+        export PATH="$PYENV_ROOT/versions/$PYTHON_VERSION/bin:$PATH"
+        FOUND_PY_VERSION=$($PYENV_ROOT/versions/$PYTHON_VERSION/bin/python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
+        if [[ "$FOUND_PY_VERSION" != "$PYTHON_VERSION" ]]; then
+            fail "pyenv python version mismatch: $FOUND_PY_VERSION != $PYTHON_VERSION"
+        fi
+        info "Using pyenv Python $FOUND_PY_VERSION"
+    else
+        warn "python3 version $PYTHON_VERSION not found and pyenv not available."
+        warn "This script no longer installs Python system-wide. Please install Python $PYTHON_VERSION via pyenv or the official installer and re-run."
+        fail "python version mismatch: ${FOUND_PY_VERSION:-none} != $PYTHON_VERSION"
+    fi
 fi
 
 break_legacy_easy_install
