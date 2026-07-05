@@ -45,6 +45,11 @@ on:
 jobs:
   macos-arm64:
     runs-on: macos-latest
+    env:
+      OPENSSL_DIR: "$(brew --prefix openssl@3)"
+      LDFLAGS: "-L$(brew --prefix openssl@3)/lib"
+      CPPFLAGS: "-I$(brew --prefix openssl@3)/include"
+      PKG_CONFIG_PATH: "$(brew --prefix openssl@3)/lib/pkgconfig"
 
     steps:
       - name: Checkout code
@@ -96,6 +101,11 @@ jobs:
 
   macos-x86_64:
     runs-on: macos-latest
+    env:
+      OPENSSL_DIR: "$(brew --prefix openssl@3)"
+      LDFLAGS: "-L$(brew --prefix openssl@3)/lib"
+      CPPFLAGS: "-I$(brew --prefix openssl@3)/include"
+      PKG_CONFIG_PATH: "$(brew --prefix openssl@3)/lib/pkgconfig"
 
     steps:
       - name: Checkout code
